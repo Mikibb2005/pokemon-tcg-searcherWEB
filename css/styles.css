@@ -1,0 +1,68 @@
+/* styles.css - tema Pokémon (amarillo/azul/rojo), layout y modal */
+
+/* tipografía y reset */
+:root{
+  --bg: #f7f7f9;
+  --card-bg: #ffffff;
+  --accent: #ffcc00; /* amarillo Pokémon */
+  --accent-dark: #f0b90a;
+  --accent-2: #2b6fbf; /* azul */
+  --danger: #e03b3b;
+  --muted: #6b7280;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#fbfbfc,var(--bg));color:#111;}
+
+/* topbar */
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 18px;background:linear-gradient(90deg,var(--accent), #ffd24d);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px}
+.topbar h1{margin:0;font-size:1.1rem;color:#0b254a}
+
+nav .navbtn{background:transparent;border:2px solid rgba(11,37,74,0.12);padding:6px 10px;border-radius:8px;color:#0b254a;text-decoration:none}
+
+/* container */
+.container{max-width:1100px;margin:18px auto;padding:0 14px}
+
+/* controles */
+.controls{background:rgba(255,255,255,0.9);padding:12px;border-radius:10px;box-shadow:0 2px 8px rgba(11,37,74,0.04);display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.controls .row{display:flex;gap:8px;align-items:center}
+input,select,button{padding:8px;border-radius:8px;border:1px solid #ddd;background:#fff}
+input::placeholder{color:#aaa}
+.btn{cursor:pointer;border:0}
+.btn.primary{background:var(--accent-2);color:white;padding:8px 12px;border-radius:8px}
+.btn.ghost{background:transparent;border:1px solid rgba(11,37,74,0.08);color:var(--muted);padding:8px 12px;border-radius:8px}
+
+/* grid de cartas */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.card{display:flex;gap:10px;background:var(--card-bg);padding:10px;border-radius:10px;align-items:flex-start;box-shadow:0 4px 14px rgba(11,37,74,0.04);cursor:pointer;transition:transform .12s}
+.card:hover{transform:translateY(-4px)}
+.thumb{width:90px;height:130px;border-radius:8px;background:#eee;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.meta{flex:1}
+.meta strong{display:block;font-size:1rem;margin-bottom:4px}
+.variants{font-size:13px;color:var(--muted)}
+.small{font-size:12px;color:var(--muted)}
+.mono{font-family:monospace;font-size:12px}
+
+/* modal */
+.modal{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(6,12,34,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;visibility:hidden;opacity:0;transition:opacity .12s}
+.modal[aria-hidden="false"]{visibility:visible;opacity:1}
+.modal-content{background:#fff;padding:14px;border-radius:12px;max-width:1000px;width:95%;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.modal-body{display:flex;gap:16px;align-items:flex-start}
+.modal-image img{width:350px;max-width:45vw;height:auto;border-radius:8px}
+.modal-info{flex:1}
+.modal-close{position:absolute;right:20px;top:14px;background:var(--danger);color:#fff;border-radius:50%;width:36px;height:36px;border:0;font-size:20px}
+
+/* listas page */
+.lists-manager{background:rgba(255,255,255,0.95);padding:14px;border-radius:10px;box-shadow:0 4px 14px rgba(11,37,74,0.04)}
+.lists-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
+.list-item{padding:10px;border-radius:10px;background:linear-gradient(180deg,#fff,#fff);box-shadow:0 3px 10px rgba(11,37,74,0.04);display:flex;justify-content:space-between;align-items:center}
+.list-item strong{display:block}
+
+/* responsive */
+@media (max-width:700px){
+  .modal-body{flex-direction:column}
+  .modal-image img{width:100%;max-width:100%}
+}
