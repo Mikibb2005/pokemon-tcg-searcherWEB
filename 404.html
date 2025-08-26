@@ -1,0 +1,22 @@
+<!-- /404.html -->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0; url=/" />
+    <script>
+      // Alternativa robusta para SPAs que usan history API:
+      // Si la app usa rutas del lado cliente sin hashes, puedes intentar:
+      (function () {
+        var path = location.pathname;
+        // si necesitas, puedes mapear rutas: location.replace('/#' + path);
+        // por defecto vamos a index:
+        location.replace('/');
+      })();
+    </script>
+    <title>Redireccionando…</title>
+  </head>
+  <body>
+    Redireccionando...
+  </body>
+</html>

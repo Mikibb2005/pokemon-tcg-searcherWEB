@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mis listas — PTCG DB</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="css/pokeball.svg" alt="logo" class="logo" />
+      <h1>Mis listas</h1>
+    </div>
+    <nav>
+      <a href="index.html" class="navbtn">Buscar cartas</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="lists-manager">
+      <div class="newlist">
+        <input id="newListName" placeholder="Nombre nueva lista" />
+        <button id="createListBtn" class="btn primary">Crear lista</button>
+        <button id="exportBtn" class="btn ghost">Exportar JSON</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none" />
+        <button id="importBtn" class="btn">Importar</button>
+      </div>
+
+      <div id="listsContainer" class="lists-grid"></div>
+
+      <hr/>
+
+      <section id="listDetail" style="display:none">
+        <h2 id="listTitle"></h2>
+        <div id="listCards" class="grid"></div>
+        <button id="backToLists" class="btn">Volver a listas</button>
+      </section>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/lists.js"></script>
+</body>
+</html>
