@@ -133,7 +133,7 @@ function renderResults(cards) {
     }
 
     const fragment = document.createDocumentFragment();
-    
+
     cards.forEach(card => {
         const cardEl = document.createElement('div');
         cardEl.className = 'card';
@@ -154,10 +154,8 @@ function renderResults(cards) {
                 </div>
             </div>
         `;
-        
-        // Asignar el evento click
+        // --- ESTE ES EL CLICK QUE ABRE EL MODAL ---
         cardEl.addEventListener('click', () => openModal(card));
-        
         fragment.appendChild(cardEl);
     });
 
@@ -201,21 +199,52 @@ window.changePage = async function(page) {
   window.scrollTo(0, 0);
 }
 
-// Modal
+// --- Lógica de control del Modal ---
+const modalCloseHandler = (event) => {
+  if (event.key === 'Escape' || event.target.id === 'cardModal') {
+    closeModal();
+  }
+};
+
+function buildCardmarketUrl(card) {
+    // Usamos el nombre y el set para formar la URL de búsqueda
+    const baseUrl = "https://www.cardmarket.com/es/Pokemon/Products/Singles";
+    const setName = card.set?.name ? encodeURIComponent(card.set.name.replace(/ /g, "-")) : "";
+    const cardName = card.name ? encodeURIComponent(card.name.replace(/ /g, "-")) : "";
+    return `${baseUrl}/${setName}/${cardName}`;
+}
+
 function openModal(card) {
     const modal = document.getElementById('cardModal');
     if (!modal) return;
+
+    // Precios de Cardmarket con enlace directo
+    let cardmarketHtml = '';
+    if (card.cardmarket?.prices) {
+        cardmarketHtml = `
+            <div class="cardmarket-prices">
+                <h3>Precios Cardmarket</h3>
+                <ul>
+                    <li><strong>Precio medio:</strong> ${card.cardmarket.prices.averageSellPrice?.toFixed(2) || 'N/A'} €</li>
+                    <li><strong>Precio tendencia:</strong> ${card.cardmarket.prices.trendPrice?.toFixed(2) || 'N/A'} €</li>
+                    <li><strong>Precio más bajo:</strong> ${card.cardmarket.prices.lowPrice?.toFixed(2) || 'N/A'} €</li>
+                    ${card.cardmarket.prices.lowPriceExPlus ? `<li><strong>Precio más bajo (EX+):</strong> ${card.cardmarket.prices.lowPriceExPlus.toFixed(2)} €</li>` : ''}
+                    <li>
+                        <a href="${buildCardmarketUrl(card)}" target="_blank" rel="noopener noreferrer">
+                            Ver en Cardmarket
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        `;
+    }
 
     modal.innerHTML = `
         <div class="modal-content">
             <button class="modal-close" onclick="closeModal()">&times;</button>
             <div class="modal-body">
                 <div class="modal-image">
-                    <img 
-                        src="${card.images?.large || card.images?.small}" 
-                        alt="${escapeHtml(card.name)}"
-                        loading="lazy"
-                    >
+                    <img src="${card.images?.large || card.images?.small}" alt="${escapeHtml(card.name)}">
                 </div>
                 <div class="modal-info">
                     <h2>${escapeHtml(card.name)}</h2>
@@ -224,51 +253,90 @@ function openModal(card) {
                         <p><strong>Número:</strong> ${escapeHtml(card.number || '')}</p>
                         <p><strong>Rareza:</strong> ${escapeHtml(card.rarity || 'N/A')}</p>
                     </div>
-                    
-                    ${card.cardmarket?.prices ? `
-                        <div class="prices cardmarket">
-                            <h3>Precios Cardmarket:</h3>
-                            <ul>
-                                <li>Precio medio: ${card.cardmarket.prices.averageSellPrice?.toFixed(2) || 'N/A'}€</li>
-                                <li>Precio tendencia: ${card.cardmarket.prices.trendPrice?.toFixed(2) || 'N/A'}€</li>
-                                <li>Precio más bajo: ${card.cardmarket.prices.lowPrice?.toFixed(2) || 'N/A'}€</li>
-                                ${card.cardmarket.url ? 
-                                    `<li><a href="${card.cardmarket.url}" target="_blank">Ver en Cardmarket</a></li>` : 
-                                    ''}
-                            </ul>
-                        </div>
-                    ` : ''}
+                    ${cardmarketHtml}
                 </div>
             </div>
         </div>
     `;
-
-    // Mostrar el modal
-    modal.style.display = 'flex';
+    modal.classList.add('is-visible');
     modal.setAttribute('aria-hidden', 'false');
-
-    // Añadir listener para cerrar con ESC
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeModal();
-    });
-
-    // Añadir listener para cerrar al hacer clic fuera
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
+    document.body.style.overflow = 'hidden';
 }
 
-// Función para cerrar el modal
 function closeModal() {
     const modal = document.getElementById('cardModal');
     if (modal) {
-        modal.style.display = 'none';
+        modal.classList.remove('is-visible');
         modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+}
+window.closeModal = closeModal;
+
+// Fetch y renderizado de noticias
+async function fetchNewsRSS(rssUrl) {
+    const apiKey = 'd7rroqjnxsamqftlixqkifk2doywqetrqadpoewx';
+    const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&api_key=${apiKey}`;
+    try {
+        const resp = await fetch(apiUrl);
+        const data = await resp.json();
+        return data.items || [];
+    } catch (err) {
+        console.warn('Error cargando noticias:', err);
+        return [];
     }
 }
 
-// Hacer la función closeModal disponible globalmente
-window.closeModal = closeModal;
+async function renderNewsSidebar() {
+    const newsList = document.getElementById('newsList');
+    if (!newsList) return;
+
+    newsList.innerHTML = '<div class="news-item">Cargando noticias...</div>';
+
+    // Fuentes RSS
+    const sources = [
+        {
+            name: "JustinBasil",
+            url: "https://www.pokebeach.com/feed"
+        },
+        {
+            name: "Pokémon Oficial",
+            url: "https://www.pokeguardian.com/rss"
+        }
+    ];
+
+    let allNews = [];
+
+    for (const src of sources) {
+        const items = await fetchNewsRSS(src.url);
+        // Tomar solo las 2 más recientes de cada fuente
+        const latest = items
+            .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+            .slice(0, 2)
+            .map(item => ({
+                title: item.title,
+                link: item.link,
+                date: item.pubDate,
+                source: src.name,
+                description: item.description
+            }));
+        allNews = allNews.concat(latest);
+    }
+
+    // Ordena por fecha descendente
+    allNews.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    newsList.innerHTML = allNews.length
+        ? allNews.map(news => `
+            <article class="news-item">
+                <h3>${news.title}</h3>
+                <p>${news.description.replace(/<[^>]+>/g, '').slice(0, 120)}...</p>
+                <small>${news.source} · ${new Date(news.date).toLocaleDateString()}</small><br>
+                <a href="${news.link}" target="_blank" rel="noopener">Leer más</a>
+            </article>
+        `).join('')
+        : '<div class="news-item">No hay noticias recientes.</div>';
+}
 
 // Event Listeners
 function setupEventListeners() {
@@ -317,4 +385,5 @@ function setupEventListeners() {
 document.addEventListener('DOMContentLoaded', () => {
   populateSets();
   setupEventListeners();
+  renderNewsSidebar();
 });

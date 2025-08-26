@@ -19,49 +19,54 @@
     </header>
 
     <main class="container">
-        <!-- Controles de búsqueda y filtros -->
-        <section class="controls" aria-label="Controles de búsqueda y filtros">
-            <div class="row">
-                <input id="searchName" placeholder="Buscar por nombre..." />
-                <button id="buscarBtn" class="btn primary">Buscar</button>
-            </div>
-            <div class="row">
-                <input id="cardNumber" placeholder="Número (ej: 25)" style="width:160px;" />
-                <select id="expansionSelect">
-                    <option value="">Cualquier expansión</option>
-                </select>
-                <select id="raritySelect">
-                    <option value="">Cualquier rareza</option>
-                    <option value="Common">Common</option>
-                    <option value="Uncommon">Uncommon</option>
-                    <option value="Rare">Rare</option>
-                    <option value="Rare Holo">Rare Holo</option>
-                    <option value="Ultra Rare">Ultra Rare</option>
-                    <option value="Secret Rare">Secret Rare</option>
-                    <option value="Rare Rainbow">Rare Rainbow</option>
-                </select>
-            </div>
-            <div class="row">
-                <button id="clearBtn" class="btn ghost">Limpiar</button>
-            </div>
+        <section class="main-content">
+            <!-- Controles de búsqueda y filtros -->
+            <section class="controls" aria-label="Controles de búsqueda y filtros">
+                <div class="row">
+                    <input id="searchName" placeholder="Buscar por nombre..." />
+                    <button id="buscarBtn" class="btn primary">Buscar</button>
+                </div>
+                <div class="row">
+                    <input id="cardNumber" placeholder="Número (ej: 25)" style="width:160px;" />
+                    <select id="expansionSelect">
+                        <option value="">Cualquier expansión</option>
+                    </select>
+                    <select id="raritySelect">
+                        <option value="">Cualquier rareza</option>
+                        <option value="Common">Common</option>
+                        <option value="Uncommon">Uncommon</option>
+                        <option value="Rare">Rare</option>
+                        <option value="Rare Holo">Rare Holo</option>
+                        <option value="Ultra Rare">Ultra Rare</option>
+                        <option value="Secret Rare">Secret Rare</option>
+                        <option value="Rare Rainbow">Rare Rainbow</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <button id="clearBtn" class="btn ghost">Limpiar</button>
+                </div>
+            </section>
+
+            <!-- Grid para las cartas -->
+            <section id="cardsSection">
+                <div id="cardsGrid" class="grid" aria-live="polite"></div>
+            </section>
         </section>
 
-        <!-- Grid para las cartas -->
-        <section id="cardsSection">
-            <div id="cardsGrid" class="grid" aria-live="polite"></div>
-        </section>
+        <aside class="news-sidebar">
+            <h2>Noticias Pokémon TCG</h2>
+            <div id="newsList" class="news-list"></div>
+        </aside>
     </main>
 
-    <!-- Modal para detalles de la carta -->
-    <div id="cardModal" class="modal" aria-hidden="true">
-        <!-- El contenido se insertará dinámicamente -->
-    </div>
+    <!-- Contenedor del Modal para los detalles de la carta -->
+    <!-- Este div está vacío y oculto por defecto. JS lo llenará y mostrará. -->
+    <div id="cardModal" class="modal" aria-hidden="true"></div>
 
-    <!-- Scripts: Carga única y ordenada de módulos -->
-    <!-- Asegúrate de que el orden sea este y que no haya otros scripts -->
+    <!-- Scripts -->
     <script type="module" src="js/utils.js"></script>
     <script type="module" src="js/state.js"></script>
-    <script type="module" src="js/cache.js"></script> <!-- Añadido/Reemplazado -->
+    <script type="module" src="js/cache.js"></script>
     <script type="module" src="js/api.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>
