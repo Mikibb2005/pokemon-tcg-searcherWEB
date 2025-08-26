@@ -1,3 +1,8 @@
-// config.js
-window.USE_PROXY = false;
-window.PTCG_API_KEY = "209c7868-00bb-467f-9ce5-6ac4443cf8c5";
+// js/config.js
+// NO incluir claves reales aquí. Este archivo debe contener solo valores públicos o placeholders.
+// Si necesitas usar una API key, usa un backend / funciones serverless para ocultarla.
+
+export const API_BASE = 'https://api.pokemontcg.io/v2';
+
+// Placeholder: añade la key localmente en .env (si usas un backend), o usa un proxy.
+export const API_KEY = 'REPLACE_ME';

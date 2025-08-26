@@ -1,5 +1,5 @@
-// /src/js/lazyload.js
-export function initLazyLoad(rootMargin = '200px') {
+// /js/lazyload.js
+export function initLazyLoad(rootMargin = '300px') {
   const imgs = document.querySelectorAll('img[data-src], picture[data-src]');
   if (!imgs || imgs.length === 0) return;
 
@@ -28,7 +28,6 @@ export function initLazyLoad(rootMargin = '200px') {
 
     imgs.forEach(i => io.observe(i));
   } else {
-    // Fallback: cargar todo
     imgs.forEach(el => {
       const img = el.tagName.toLowerCase() === 'picture' ? el.querySelector('img') : el;
       if (!img) return;
