@@ -1,56 +1,114 @@
-<!-- zona dentro de body donde mostramos sets / cards -->
-<div id="sets-container"></div>
-<div id="cards-container"></div>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PokmTCGSearcher - Mikissito</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<script type="module" src="/src/js/main.js" defer></script>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="css/pokeball.svg" alt="logo" class="logo" />
+      <h1>Base de datos de Pokemon TCG de Mikissito</h1>
+    </div>
+    <nav>
+      <a href="lists.html" class="navbtn">Mis listas</a>
+    </nav>
+  </header>
 
-<!-- scripts: usa type=module -->
-<script type="module">
-  import { initLazyLoad } from './js/lazyload.js';
-  import { getExpansions, getCardsByExpansion } from './js/api.js';
+  <main class="container">
+    <!-- controles (igual que antes) -->
+    <section class="controls" aria-label="Controles de búsqueda y filtros">
+      <div class="row">
+        <input id="searchName" placeholder="Buscar por nombre..." />
+        <button id="buscarBtn" class="btn primary">Buscar</button>
+      </div>
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    initLazyLoad('200px');
+      <div class="row">
+        <input id="cardNumber" placeholder="Número (ej: 25)" style="width:160px;" />
+        <select id="expansionSelect">
+          <option value="">Cargando expansiones...</option>
+        </select>
 
-    // listar expansiones
-    try {
-      const setsResp = await getExpansions();
-      // adapta este código al shape real de tu API
-      const sets = setsResp.data || setsResp; // ejemplo: { data: [...] } o [...]
-      const setsContainer = document.getElementById('sets-container');
-      setsContainer.innerHTML = sets.map(s=>{
-        return `<button class="set-btn" data-set-id="${s.id}">${s.name}</button>`;
-      }).join('');
-      setsContainer.addEventListener('click', async (e) => {
-        const btn = e.target.closest('.set-btn');
-        if (!btn) return;
-        const setId = btn.dataset.setId;
-        // limpia contenedor de cards
-        const cardsContainer = document.getElementById('cards-container');
-        cardsContainer.innerHTML = 'Cargando...';
-        const cardsResp = await getCardsByExpansion(setId, 1, 24);
-        const cards = cardsResp.data || cardsResp.cards || [];
-        cardsContainer.innerHTML = cards.map(c => `
-          <article class="card-item">
-            <picture>
-              <source type="image/webp" data-srcset="${(c.images?.small ?? '')} 200w">
-              <img data-src="${c.images?.small ?? ''}" loading="lazy" width="200" height="280" alt="${c.name}">
-            </picture>
-            <h4>${c.name}</h4>
-          </article>
-        `).join('');
-        initLazyLoad('200px'); // re-inicializa lazyload para las nuevas imágenes
-      });
-    } catch (err) {
-      console.error('Error cargando sets:', err);
+        <select id="raritySelect">
+          <option value="">Cualquier rareza</option>
+          <option value="Common">Common</option>
+          <option value="Uncommon">Uncommon</option>
+          <option value="Rare">Rare</option>
+          <option value="Rare Holo">Rare Holo</option>
+          <option value="Ultra Rare">Ultra Rare</option>
+          <option value="Secret Rare">Secret Rare</option>
+          <option value="Rare Rainbow">Rare Rainbow</option>
+        </select>
+
+        <select id="variantFilter">
+          <option value="all">Todas variantes</option>
+          <option value="holo">Sólo Holo/Foil</option>
+          <option value="tournament">Sólo Torneo/Promo</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label>Ordenar por:
+          <select id="sortSelect">
+            <option value="none">Por defecto</option>
+            <option value="number">Número</option>
+            <option value="name">Nombre</option>
+            <option value="price">Precio</option>
+          </select>
+        </label>
+
+        <label>Orden:
+          <select id="sortOrder">
+            <option value="desc">Desc</option>
+            <option value="asc">Asc</option>
+          </select>
+        </label>
+
+        <button id="filtrarBtn" class="btn">Aplicar filtros</button>
+        <button id="clearBtn" class="btn ghost">Limpiar</button>
+      </div>
+    </section>
+
+    <section id="cardsSection">
+      <div id="cardsGrid" class="grid" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- Modal detalle carta -->
+  <div id="cardModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <button id="closeModal" class="modal-close">&times;</button>
+      <div class="modal-body">
+        <div class="modal-image">
+          <img id="modalImage" src="" alt="Carta grande" />
+        </div>
+        <div class="modal-info">
+          <h2 id="modalName"></h2>
+          <p id="modalSet"></p>
+          <p id="modalNumber"></p>
+          <p id="modalRarity"></p>
+          <p id="modalPrice"></p>
+          <pre id="modalRaw" class="small mono"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+
+  <!-- registrar service worker para cache y stale-while-revalidate -->
+  <script>
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        console.log('SW registrado:', reg.scope);
+      }).catch(err => console.warn('SW registro falló:', err));
     }
-
-    // registra SW
-    if ('serviceWorker' in navigator) {
-      try {
-        await navigator.serviceWorker.register('/sw.js');
-        console.log('SW registered');
-      } catch (err) {
-        console.warn('SW fail', err);
-      }
-    }
-  });
-</script>
+  </script>
+</body>
+</html>
