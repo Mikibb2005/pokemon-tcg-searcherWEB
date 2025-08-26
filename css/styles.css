@@ -277,6 +277,238 @@ input::placeholder{color:#aaa}
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* Estilos para el selector de idiomas y precios */
+.language-selector {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.language-selector select {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.price-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.price-section {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.price-section h4 {
+    margin: 0 0 0.5rem 0;
+    color: #2b6fbf;
+    font-size: 0.9rem;
+}
+
+.price-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.price-section li {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.cardmarket-link {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.cardmarket-link a {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: var(--accent-2);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.cardmarket-link small {
+    display: block;
+    color: var(--muted);
+}
+
+/* Switch de API */
+.api-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 1rem;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--accent-2);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+#apiLabel {
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* Estilos para el modal mejorado */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.card-number {
+    font-size: 1.2rem;
+    color: var(--muted);
+}
+
+.detail-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.detail-section h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--accent-2);
+}
+
+.detail-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.detail-section li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.rarity-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+    background: #eee;
+}
+
+.rarity-badge.common { background: #d1d5db; }
+.rarity-badge.uncommon { background: #93c5fd; }
+.rarity-badge.rare { background: #fcd34d; }
+.rarity-badge.ultra-rare { background: #f472b6; }
+.rarity-badge.secret-rare { background: linear-gradient(45deg, #f472b6, #fcd34d); }
+
+.variants-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.variant-thumb {
+    width: 40px;
+    height: 56px;
+    object-fit: contain;
+    margin-right: 0.5rem;
+}
+
+.card-ownership {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.ownership-checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.ownership-checkbox input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+}
+
+.checkbox-label {
+    font-size: 1rem;
+    color: var(--text);
+}
+
+/* Estilos para el selector de expansiones */
+#expansionSelect {
+    max-width: 300px;
+    font-size: 0.95rem;
+}
+
+#expansionSelect optgroup {
+    font-weight: bold;
+    color: var(--accent-2);
+    background: #f8f9fa;
+}
+
+#expansionSelect option {
+    padding: 4px 8px;
+    color: var(--text);
+}
+
+#expansionSelect option:hover {
+    background-color: var(--accent-2);
+    color: white;
+}
+
 /* responsive */
 @media (max-width:700px){
   .modal-body{flex-direction:column}

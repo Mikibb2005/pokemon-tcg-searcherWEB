@@ -1,6 +1,6 @@
 // js/main.js (ES module)
 import { debounce } from './utils.js';
-import { fetchCardsByQuery, fetchSets } from './api.js';
+import { fetchCardsByQuery, fetchSets, LANGUAGES } from './api.js';
 import { getImage, setImage } from './cache.js';
 import { LoadingState } from './state.js'; // Añadir esta importación
 
@@ -12,6 +12,8 @@ const cardNumber = document.getElementById('cardNumber');
 const cardsGrid = document.getElementById('cardsGrid');
 const buscarBtn = document.getElementById('buscarBtn');
 const clearBtn = document.getElementById('clearBtn');
+const apiToggle = document.getElementById('apiToggle');
+const apiLabel = document.getElementById('apiLabel');
 
 // Estado global
 let currentPage = 1;
@@ -28,41 +30,68 @@ function escapeHtml(unsafe) {
 }
 
 async function populateSets() {
-  if (!expansionSelect) return;
-  
-  try {
-    expansionSelect.innerHTML = '<option value="">Cargando expansiones...</option>';
+    if (!expansionSelect) return;
     
-    const sets = await fetchSets();
-    
-    if (!sets.length) {
-      throw new Error('No se pudieron cargar las expansiones');
+    try {
+        expansionSelect.innerHTML = '<option value="">Cargando expansiones...</option>';
+        
+        const sets = await fetchSets();
+        
+        if (!sets.length) {
+            throw new Error('No se pudieron cargar las expansiones');
+        }
+
+        // Agrupar sets por series
+        const seriesGroups = sets.reduce((groups, set) => {
+            const serie = set.series || 'Otras';
+            if (!groups[serie]) {
+                groups[serie] = [];
+            }
+            groups[serie].push({
+                ...set,
+                cardCount: {
+                    total: set.cardCount?.total || set.cardCount?.official || 0
+                }
+            });
+            return groups;
+        }, {});
+
+        // Crear el HTML con optgroups por serie
+        const optionsHtml = Object.entries(seriesGroups)
+            .sort(([serieA, setsA], [serieB, setsB]) => {
+                // Ordenar series por fecha del set más reciente
+                const latestSetA = setsA[0];
+                const latestSetB = setsB[0];
+                return new Date(latestSetB.releaseDate || 0) - new Date(latestSetA.releaseDate || 0);
+            })
+            .map(([serie, serieSets]) => `
+                <optgroup label="${serie}">
+                    ${serieSets.map(set => `
+                        <option value="${set.id}">
+                            ${set.name} 
+                            ${set.releaseDate ? 
+                                `(${new Date(set.releaseDate).toLocaleDateString('es-ES', {
+                                    year: 'numeric',
+                                    month: 'short'
+                                })})` : 
+                                ''}
+                            - ${set.cardCount.total} cartas
+                        </option>
+                    `).join('')}
+                </optgroup>
+            `).join('');
+
+        expansionSelect.innerHTML = `
+            <option value="">Cualquier expansión</option>
+            ${optionsHtml}
+        `;
+
+    } catch (err) {
+        console.error('Error cargando expansiones:', err);
+        expansionSelect.innerHTML = `
+            <option value="">Error cargando expansiones</option>
+        `;
     }
-
-    // Ordenar por fecha
-    sets.sort((a, b) => {
-      if (a.releaseDate && b.releaseDate) {
-        return new Date(b.releaseDate) - new Date(a.releaseDate);
-      }
-      return (a.name || '').localeCompare(b.name || '');
-    });
-
-    // Renderizar opciones
-    expansionSelect.innerHTML = `
-      <option value="">Cualquier expansión</option>
-      ${sets.map(set => `
-        <option value="${set.id}">
-          ${set.name}${set.releaseDate ? ` (${set.releaseDate.slice(0,4)})` : ''}
-        </option>
-      `).join('')}
-    `;
-
-  } catch (err) {
-    console.error('Error cargando expansiones:', err);
-    expansionSelect.innerHTML = `
-      <option value="">Error cargando expansiones</option>
-    `;
-  }
 }
 
 function readFilters() {
@@ -76,35 +105,38 @@ function readFilters() {
 
 // Función principal de búsqueda
 async function searchCards(params = {}) {
-  try {
-    LoadingState.show(); // Ahora LoadingState estará definido
-    cardsGrid.innerHTML = '<div class="loading">Buscando cartas...</div>';
+    try {
+        cardsGrid.innerHTML = '<div class="loading">Buscando cartas...</div>';
 
-    const filters = {
-      name: searchName?.value?.trim(),
-      setId: expansionSelect?.value,
-      number: cardNumber?.value?.trim(),
-      rarities: raritySelect?.value ? [raritySelect.value] : [],
-      page: params.page || currentPage,
-      pageSize: 20
-    };
+        const filters = {
+            name: searchName?.value?.trim(),
+            setId: expansionSelect?.value,
+            number: cardNumber?.value?.trim(),
+            rarities: raritySelect?.value ? [raritySelect.value] : [],
+            page: params.page || currentPage,
+            pageSize: 20
+        };
 
-    const { cards, totalCount, page } = await fetchCardsByQuery(filters);
-    
-    // Actualizar estado
-    currentPage = page;
-    totalPages = Math.ceil(totalCount / 20);
+        console.log('Buscando con filtros:', filters); // Para debug
 
-    // Renderizar resultados
-    renderResults(cards, totalCount);
-    renderPagination();
+        const { cards, totalCount, page } = await fetchCardsByQuery(filters);
+        
+        // Actualizar estado
+        currentPage = page;
+        totalPages = Math.ceil(totalCount / 20);
 
-  } catch (error) {
-    console.error('Error en búsqueda:', error);
-    cardsGrid.innerHTML = '<div class="error">Error al buscar cartas</div>';
-  } finally {
-    LoadingState.hide(); // Y aquí también funcionará
-  }
+        // Renderizar resultados
+        if (cards && cards.length > 0) {
+            renderResults(cards);
+            renderPagination();
+        } else {
+            cardsGrid.innerHTML = '<div class="no-results">No se encontraron cartas</div>';
+        }
+
+    } catch (error) {
+        console.error('Error en búsqueda:', error);
+        cardsGrid.innerHTML = '<div class="error">Error al buscar cartas</div>';
+    }
 }
 
 // Reemplaza la función loadCardImage con esta versión más simple:
@@ -206,71 +238,76 @@ const modalCloseHandler = (event) => {
   }
 };
 
-function buildCardmarketUrl(card) {
-    // Usamos el nombre y el set para formar la URL de búsqueda
-    const baseUrl = "https://www.cardmarket.com/es/Pokemon/Products/Singles";
-    const setName = card.set?.name ? encodeURIComponent(card.set.name.replace(/ /g, "-")) : "";
-    const cardName = card.name ? encodeURIComponent(card.name.replace(/ /g, "-")) : "";
-    return `${baseUrl}/${setName}/${cardName}`;
-}
-
 function openModal(card) {
     const modal = document.getElementById('cardModal');
     if (!modal) return;
-
-    // Precios de Cardmarket con enlace directo
-    let cardmarketHtml = '';
-    if (card.cardmarket?.prices) {
-        cardmarketHtml = `
-            <div class="cardmarket-prices">
-                <h3>Precios Cardmarket</h3>
-                <ul>
-                    <li><strong>Precio medio:</strong> ${card.cardmarket.prices.averageSellPrice?.toFixed(2) || 'N/A'} €</li>
-                    <li><strong>Precio tendencia:</strong> ${card.cardmarket.prices.trendPrice?.toFixed(2) || 'N/A'} €</li>
-                    <li><strong>Precio más bajo:</strong> ${card.cardmarket.prices.lowPrice?.toFixed(2) || 'N/A'} €</li>
-                    ${card.cardmarket.prices.lowPriceExPlus ? `<li><strong>Precio más bajo (EX+):</strong> ${card.cardmarket.prices.lowPriceExPlus.toFixed(2)} €</li>` : ''}
-                    <li>
-                        <a href="${buildCardmarketUrl(card)}" target="_blank" rel="noopener noreferrer">
-                            Ver en Cardmarket
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        `;
-    }
 
     modal.innerHTML = `
         <div class="modal-content">
             <button class="modal-close" onclick="closeModal()">&times;</button>
             <div class="modal-body">
                 <div class="modal-image">
-                    <img src="${card.images?.large || card.images?.small}" alt="${escapeHtml(card.name)}">
-                </div>
-                <div class="modal-info">
-                    <h2>${escapeHtml(card.name)}</h2>
-                    <div class="basic-info">
-                        <p><strong>Set:</strong> ${escapeHtml(card.set?.name || '')}</p>
-                        <p><strong>Número:</strong> ${escapeHtml(card.number || '')}</p>
-                        <p><strong>Rareza:</strong> ${escapeHtml(card.rarity || 'N/A')}</p>
+                    <img src="${card.images.large}" alt="${escapeHtml(card.name)}">
+                    
+                    <div class="language-selector">
+                        <h3>Idiomas disponibles</h3>
+                        <select id="cardLanguage" onchange="changeCardLanguage(this.value, '${card.id}')">
+                            ${Object.entries(LANGUAGES).map(([code, name]) => `
+                                <option value="${code}" ${code === 'es' ? 'selected' : ''}>
+                                    ${name}
+                                </option>
+                            `).join('')}
+                        </select>
                     </div>
-                    ${cardmarketHtml}
+                </div>
+
+                <div class="modal-info">
+                    <div class="card-header">
+                        <h2>${escapeHtml(card.name)}</h2>
+                        <span class="card-number">#${escapeHtml(card.number)}</span>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Información básica</h3>
+                        <ul>
+                            <li><strong>Set:</strong> ${escapeHtml(card.set.name)} 
+                                ${card.set.series ? `(${escapeHtml(card.set.series)})` : ''}</li>
+                            <li><strong>Rareza:</strong> ${escapeHtml(card.rarity || 'N/A')}</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     `;
+
     modal.classList.add('is-visible');
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
+
+    // Event listeners para cerrar
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', handleEsc);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
 }
 
+// Añade esta función para cerrar el modal
 function closeModal() {
     const modal = document.getElementById('cardModal');
     if (modal) {
         modal.classList.remove('is-visible');
         modal.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
+        // Limpiar los event listeners
+        document.removeEventListener('keydown', modalCloseHandler);
+        modal.removeEventListener('click', modalCloseHandler);
     }
 }
+
+// Hacer accesible la función closeModal globalmente
 window.closeModal = closeModal;
 
 // Fetch y renderizado de noticias
@@ -340,45 +377,34 @@ async function renderNewsSidebar() {
 
 // Event Listeners
 function setupEventListeners() {
-  // Búsqueda por nombre with debounce
-  searchName?.addEventListener('input', debounce(() => {
-    currentPage = 1;
-    searchCards();
-  }, 300));
+    // Búsqueda por nombre with debounce
+    searchName?.addEventListener('input', debounce(() => {
+        currentPage = 1;
+        searchCards();
+    }, 300));
 
-  // Búsqueda al presionar Enter
-  searchName?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      currentPage = 1;
-      searchCards();
-    }
-  });
-
-  // Botón de búsqueda
-  buscarBtn?.addEventListener('click', () => {
-    currentPage = 1;
-    searchCards();
-  });
-
-  // Cambio de filtros
-  [expansionSelect, raritySelect].forEach(element => {
-    element?.addEventListener('change', () => {
-      currentPage = 1;
-      searchCards();
+    // Búsqueda al presionar Enter
+    searchName?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            currentPage = 1;
+            searchCards();
+        }
     });
-  });
 
-  // Limpiar filtros
-  clearBtn?.addEventListener('click', (e) => {
-    e.preventDefault();
-    searchName.value = '';
-    expansionSelect.value = '';
-    raritySelect.value = '';
-    cardNumber.value = '';
-    currentPage = 1;
-    cardsGrid.innerHTML = '';
-    document.querySelector('.pagination')?.remove();
-  });
+    // Botón de búsqueda
+    buscarBtn?.addEventListener('click', () => {
+        currentPage = 1;
+        searchCards();
+    });
+
+    // Cambio de expansión
+    expansionSelect?.addEventListener('change', () => {
+        currentPage = 1;
+        // Si solo se selecciona una expansión, buscar todas sus cartas
+        if (expansionSelect.value && !searchName.value.trim()) {
+            searchCards();
+        }
+    });
 }
 
 // Inicialización

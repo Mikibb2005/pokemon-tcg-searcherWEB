@@ -1,102 +1,152 @@
 import { AppState } from './state.js';
 import { ApiCache } from './cache.js';
 
-// js/api.js (ES module)
-// Simple wrapper for Pokemon TCG API v2 with a local fallback for sets.
-const API_BASE = 'https://api.pokemontcg.io/v2'; // Apuntar SIEMPRE a la API oficial
-const API_KEY = '21d327be-a947-4b16-bb5c-57b7756f9c5a';
 
-let pendingRequests = new Map();
+// Actualizar la URL base
+const API_BASE = 'https://api.tcgdex.net/v2';
 
-async function apiFetch(path, params = {}) {
-    const url = new URL(API_BASE + path);
-    Object.entries(params).forEach(([key, value]) => {
-        if (value) url.searchParams.set(key, value);
-    });
+// Lenguajes disponibles en TCGdex
+export const LANGUAGES = {
+    'en': 'English',
+    'fr': 'Français',
+    'de': 'Deutsch',
+    'it': 'Italiano',
+    'es': 'Español'
+};
 
-    const urlString = url.toString();
-    
-    // Si ya hay una petición pendiente para esta URL, esperar su resultado
-    if (pendingRequests.has(urlString)) {
-        return pendingRequests.get(urlString);
-    }
-
-    const promise = fetch(urlString, {
-        headers: { 'X-Api-Key': API_KEY }
-    }).then(async response => {
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
-        const data = await response.json();
-        pendingRequests.delete(urlString);
-        return data;
-    });
-
-    pendingRequests.set(urlString, promise);
-    return promise;
-}
-
-export async function fetchSets() {
-  try {
-    // Cargar siempre los sets desde el archivo local para evitar CORS y mejorar la velocidad.
-    const resp = await fetch('data/sets.json');
-    if (!resp.ok) {
-      throw new Error('No se pudo cargar el archivo local de sets.');
-    }
-    const localData = await resp.json();
-    
-    localData.sort((a, b) => {
-      if (a.releaseDate && b.releaseDate) {
-        return new Date(b.releaseDate) - new Date(a.releaseDate);
-      }
-      return (a.name || '').localeCompare(b.name || '');
-    });
-
-    return localData;
-  } catch (localError) {
-    console.error('Error crítico cargando sets desde archivo local:', localError);
-    return []; // Devolver vacío si falla para que la app no se rompa.
-  }
-}
-
-export async function fetchCardsByQuery(params) {
-    const cacheKey = `cards-${JSON.stringify(params)}`;
-    
-    // Intentar obtener del caché primero
-    const cached = await ApiCache.get(cacheKey);
-    if (cached) {
-        console.log('Datos servidos desde caché:', cacheKey);
-        return cached;
-    }
-
+// Función para obtener todas las series
+export async function fetchSeries() {
+    console.log('Fetching series...');
     try {
-        const { name, setId, rarities, number, page = 1, pageSize = 20 } = params;
-        const queryParts = [];
+        const response = await fetch(`${API_BASE}/en/series`);
+        if (!response.ok) {
+            throw new Error(`Error API: ${response.status}`);
+        }
+        const series = await response.json();
+        console.log('Series obtenidas:', series);
+        return series;
+    } catch (error) {
+        console.error('Error obteniendo series:', error);
+        throw error;
+    }
+}
+
+// Función para obtener los sets de una serie específica
+async function fetchSeriesSets(serieId) {
+    try {
+        const response = await fetch(`${API_BASE}/en/series/${serieId}`);
+        if (!response.ok) {
+            throw new Error(`Error API: ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error(`Error obteniendo sets de la serie ${serieId}:`, error);
+        return null;
+    }
+}
+
+// Función para obtener todos los sets
+export async function fetchSets() {
+    try {
+        const series = await fetchSeries();
         
-        if (name) queryParts.push(`name:"${name}*"`);
-        if (setId) queryParts.push(`set.id:"${setId}"`);
-        if (number) queryParts.push(`number:"${number}"`);
-        if (rarities?.length) {
-            const raritiesQuery = rarities.map(r => `rarity:"${r}"`).join(' OR ');
-            queryParts.push(`(${raritiesQuery})`);
+        if (!Array.isArray(series)) {
+            throw new Error('La respuesta de series no es un array');
         }
 
-        const apiParams = {
-            page: String(page),
-            pageSize: String(pageSize),
-            orderBy: 'number',
-            q: queryParts.join(' ')
-        };
+        // Array para almacenar todas las promesas de fetching sets
+        const setPromises = series.map(async (serie) => {
+            const serieData = await fetchSeriesSets(serie.id);
+            if (!serieData || !serieData.sets) {
+                console.warn(`No se encontraron sets para la serie ${serie.id}`);
+                return [];
+            }
 
-        const data = await apiFetch('/cards', apiParams);
-        const result = {
-            cards: data.data || [],
-            totalCount: data.totalCount || 0,
-            page: data.page || 1,
-            pageSize: data.pageSize || pageSize
-        };
+            // Mapear los sets de esta serie
+            return serieData.sets.map(set => ({
+                id: set.id,
+                name: set.name,
+                series: serie.name,
+                cardCount: {
+                    total: set.cardCount?.total || 0,
+                    official: set.cardCount?.official || 0
+                },
+                logo: set.logo || null,
+                symbol: set.symbol || null,
+                releaseDate: set.releaseDate || null
+            }));
+        });
 
-        // Guardar en caché
-        await ApiCache.set(cacheKey, result);
-        return result;
+        // Esperar a que todas las promesas se resuelvan y aplanar el array
+        const allSets = (await Promise.all(setPromises)).flat();
+
+        console.log('Sets procesados:', allSets);
+        return allSets;
+    } catch (error) {
+        console.error('Error obteniendo sets:', error);
+        throw error;
+    }
+}
+
+// Función para obtener cartas por query
+export async function fetchCardsByQuery(params) {
+    try {
+        const { name, setId } = params;
+        let endpoint = '';
+        
+        if (setId) {
+            endpoint = `/en/sets/${setId}`;
+        } else {
+            endpoint = '/en/cards';
+        }
+
+        console.log('Fetching:', `${API_BASE}${endpoint}`);
+        
+        const response = await fetch(`${API_BASE}${endpoint}`);
+        if (!response.ok) {
+            throw new Error(`Error API: ${response.status}`);
+        }
+
+        const data = await response.json();
+        let cards;
+
+        if (setId) {
+            // Si es un set específico, los datos vienen en data.cards
+            cards = data.cards || [];
+        } else {
+            // Si es búsqueda global, los datos son un array de cartas
+            cards = data || [];
+        }
+
+        // Filtrar por nombre si se especifica
+        if (name) {
+            cards = cards.filter(card => 
+                card.name.toLowerCase().includes(name.toLowerCase())
+            );
+        }
+
+        // Procesar las cartas para el formato requerido
+        const processedCards = cards.map(card => ({
+            id: card.id,
+            name: card.name,
+            number: card.localId,
+            rarity: card.rarity,
+            images: {
+                small: `${card.image}/low.webp`,
+                large: `${card.image}/high.webp`
+            },
+            set: {
+                id: setId || card.set?.id,
+                name: data.name || card.set?.name,
+                series: data.series || card.set?.series
+            }
+        }));
+
+        return {
+            cards: processedCards,
+            totalCount: processedCards.length,
+            page: 1
+        };
     } catch (error) {
         console.error('Error en búsqueda:', error);
         throw error;
