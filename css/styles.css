@@ -152,7 +152,7 @@ input::placeholder{color:#aaa}
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: 0.5rem;
   margin: 2rem 0;
   padding: 1rem;
   background: white;
@@ -167,23 +167,31 @@ input::placeholder{color:#aaa}
   background: var(--accent-2);
   color: white;
   cursor: pointer;
-  transition: all 0.2s ease;
+  min-width: 40px;
+  font-weight: bold;
 }
 
 .pagination button:disabled {
-  background: var(--muted);
-  cursor: not-allowed;
-  opacity: 0.7;
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .pagination button:not(:disabled):hover {
-  background: var(--accent);
-  transform: scale(1.05);
+    background: var(--accent);
+    transform: scale(1.05);
 }
 
 .pagination span {
   color: var(--muted);
   font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 200px;
+}
+
+.pagination span small {
+    font-size: 0.8em;
 }
 
 /* Mensajes de estado */
@@ -433,8 +441,15 @@ input:checked + .slider:before {
 }
 
 .detail-section li {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
+    padding: 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.detail-section li strong {
+    min-width: 100px;
+    color: var(--accent-2);
 }
 
 .rarity-badge {
@@ -442,71 +457,35 @@ input:checked + .slider:before {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.9em;
-    background: #eee;
-}
-
-.rarity-badge.common { background: #d1d5db; }
-.rarity-badge.uncommon { background: #93c5fd; }
-.rarity-badge.rare { background: #fcd34d; }
-.rarity-badge.ultra-rare { background: #f472b6; }
-.rarity-badge.secret-rare { background: linear-gradient(45deg, #f472b6, #fcd34d); }
-
-.variants-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-}
-
-.variant-thumb {
-    width: 40px;
-    height: 56px;
-    object-fit: contain;
-    margin-right: 0.5rem;
-}
-
-.card-ownership {
-    margin-top: 1rem;
-    text-align: center;
-}
-
-.ownership-checkbox {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    cursor: pointer;
-}
-
-.ownership-checkbox input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-}
-
-.checkbox-label {
-    font-size: 1rem;
-    color: var(--text);
-}
-
-/* Estilos para el selector de expansiones */
-#expansionSelect {
-    max-width: 300px;
-    font-size: 0.95rem;
-}
-
-#expansionSelect optgroup {
-    font-weight: bold;
-    color: var(--accent-2);
-    background: #f8f9fa;
-}
-
-#expansionSelect option {
-    padding: 4px 8px;
-    color: var(--text);
-}
-
-#expansionSelect option:hover {
-    background-color: var(--accent-2);
     color: white;
+    font-weight: 500;
+}
+
+.rarity-badge.common { 
+    background: #9ca3af; 
+    color: #1f2937;
+}
+
+.rarity-badge.uncommon { 
+    background: #3b82f6; 
+}
+
+.rarity-badge.rare { 
+    background: #fbbf24;
+    color: #1f2937;
+}
+
+.rarity-badge.ultra-rare { 
+    background: linear-gradient(45deg, #ec4899, #8b5cf6); 
+}
+
+.rarity-badge.secret-rare { 
+    background: linear-gradient(45deg, #f59e0b, #db2777); 
+}
+
+.illustrator {
+    color: var(--accent-2);
+    font-style: italic;
 }
 
 /* responsive */
@@ -535,4 +514,12 @@ input:checked + .slider:before {
     width: 100%;
     margin-top: 2rem;
   }
+}
+
+.grid {
+    transition: opacity 0.3s ease;
+}
+
+.grid.loading {
+    opacity: 0.5;
 }

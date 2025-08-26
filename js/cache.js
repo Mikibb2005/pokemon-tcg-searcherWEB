@@ -2,7 +2,8 @@ const DB_NAME = 'ptcg-cache-v2';
 const DB_VERSION = 1;
 const API_STORE = 'api-cache';
 const IMG_STORE = 'image-cache';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 horas
+const CACHE_KEY = 'tcgdex_cache';
+const CACHE_DURATION = 3600000; // 1 hora
 
 let db = null;
 
@@ -113,4 +114,25 @@ export async function setImage(url, blob) {
     } catch (error) {
         console.warn('Error guardando imagen en caché:', error);
     }
+}
+
+export function saveToCache(key, data) {
+    const cache = {
+        timestamp: Date.now(),
+        data: data
+    };
+    localStorage.setItem(`${CACHE_KEY}_${key}`, JSON.stringify(cache));
+}
+
+export function getFromCache(key) {
+    const cached = localStorage.getItem(`${CACHE_KEY}_${key}`);
+    if (!cached) return null;
+    
+    const { timestamp, data } = JSON.parse(cached);
+    if (Date.now() - timestamp > CACHE_DURATION) {
+        localStorage.removeItem(`${CACHE_KEY}_${key}`);
+        return null;
+    }
+    
+    return data;
 }

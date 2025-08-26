@@ -114,20 +114,24 @@ async function searchCards(params = {}) {
             number: cardNumber?.value?.trim(),
             rarities: raritySelect?.value ? [raritySelect.value] : [],
             page: params.page || currentPage,
-            pageSize: 20
+            pageSize: 50
         };
 
-        console.log('Buscando con filtros:', filters); // Para debug
+        console.log('Buscando con filtros:', filters);
 
-        const { cards, totalCount, page } = await fetchCardsByQuery(filters);
+        const response = await fetchCardsByQuery(filters);
         
+        if (!response || !response.cards) {
+            throw new Error('Respuesta inválida de la API');
+        }
+
         // Actualizar estado
-        currentPage = page;
-        totalPages = Math.ceil(totalCount / 20);
+        currentPage = response.page;
+        totalPages = response.totalPages;
 
         // Renderizar resultados
-        if (cards && cards.length > 0) {
-            renderResults(cards);
+        if (response.cards.length > 0) {
+            renderResults(response.cards);
             renderPagination();
         } else {
             cardsGrid.innerHTML = '<div class="no-results">No se encontraron cartas</div>';
@@ -135,7 +139,7 @@ async function searchCards(params = {}) {
 
     } catch (error) {
         console.error('Error en búsqueda:', error);
-        cardsGrid.innerHTML = '<div class="error">Error al buscar cartas</div>';
+        cardsGrid.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
     }
 }
 
@@ -180,13 +184,12 @@ function renderResults(cards) {
             <div class="info">
                 <h3>${escapeHtml(card.name)}</h3>
                 <div class="meta">
-                    ${escapeHtml(card.set?.name || '')} • 
-                    #${escapeHtml(card.number || '')} • 
-                    ${escapeHtml(card.rarity || '')}
+                    ${escapeHtml(card.set?.name || '')}
+                    ${card.number ? ` • #${escapeHtml(card.number)}` : ''}
+                    ${card.rarity ? ` • ${escapeHtml(card.rarity)}` : ''}
                 </div>
             </div>
         `;
-        // --- ESTE ES EL CLICK QUE ABRE EL MODAL ---
         cardEl.addEventListener('click', () => openModal(card));
         fragment.appendChild(cardEl);
     });
@@ -195,33 +198,50 @@ function renderResults(cards) {
     cardsGrid.appendChild(fragment);
 }
 
-// Renderizar paginación
+// Mejorar la función renderPagination para mostrar más información
 function renderPagination() {
-  const paginationContainer = document.querySelector('.pagination') || document.createElement('div');
-  paginationContainer.className = 'pagination';
+    const paginationContainer = document.querySelector('.pagination') || document.createElement('div');
+    paginationContainer.className = 'pagination';
 
-  if (totalPages <= 1) {
-    paginationContainer.remove();
-    return;
-  }
+    if (totalPages <= 1) {
+        paginationContainer.remove();
+        return;
+    }
 
-  paginationContainer.innerHTML = `
-    <button 
-      ${currentPage === 1 ? 'disabled' : ''} 
-      onclick="changePage(${currentPage - 1})"
-    >Anterior</button>
-    
-    <span>Página ${currentPage} de ${totalPages}</span>
-    
-    <button 
-      ${currentPage >= totalPages ? 'disabled' : ''} 
-      onclick="changePage(${currentPage + 1})"
-    >Siguiente</button>
-  `;
+    paginationContainer.innerHTML = `
+        <button 
+            ${currentPage === 1 ? 'disabled' : ''} 
+            onclick="changePage(1)"
+            title="Primera página"
+        >«</button>
+        
+        <button 
+            ${currentPage === 1 ? 'disabled' : ''} 
+            onclick="changePage(${currentPage - 1})"
+            title="Página anterior"
+        >‹</button>
+        
+        <span>
+            Página ${currentPage} de ${totalPages}
+            <small>(50 cartas por página)</small>
+        </span>
+        
+        <button 
+            ${currentPage >= totalPages ? 'disabled' : ''} 
+            onclick="changePage(${currentPage + 1})"
+            title="Página siguiente"
+        >›</button>
+        
+        <button 
+            ${currentPage >= totalPages ? 'disabled' : ''} 
+            onclick="changePage(${totalPages})"
+            title="Última página"
+        >»</button>
+    `;
 
-  if (!paginationContainer.parentElement) {
-    cardsGrid.insertAdjacentElement('afterend', paginationContainer);
-  }
+    if (!paginationContainer.parentElement) {
+        cardsGrid.insertAdjacentElement('afterend', paginationContainer);
+    }
 }
 
 // Cambiar página
@@ -237,6 +257,18 @@ const modalCloseHandler = (event) => {
     closeModal();
   }
 };
+
+function getRarityClass(rarity) {
+    if (!rarity) return '';
+    
+    const rarityLower = rarity.toLowerCase();
+    if (rarityLower.includes('common')) return 'common';
+    if (rarityLower.includes('uncommon')) return 'uncommon';
+    if (rarityLower.includes('rare') && !rarityLower.includes('ultra') && !rarityLower.includes('secret')) return 'rare';
+    if (rarityLower.includes('ultra rare')) return 'ultra-rare';
+    if (rarityLower.includes('secret')) return 'secret-rare';
+    return '';
+}
 
 function openModal(card) {
     const modal = document.getElementById('cardModal');
@@ -272,7 +304,20 @@ function openModal(card) {
                         <ul>
                             <li><strong>Set:</strong> ${escapeHtml(card.set.name)} 
                                 ${card.set.series ? `(${escapeHtml(card.set.series)})` : ''}</li>
-                            <li><strong>Rareza:</strong> ${escapeHtml(card.rarity || 'N/A')}</li>
+                            <li>
+                                <strong>Rareza:</strong> 
+                                <span class="rarity-badge ${getRarityClass(card.rarity)}">
+                                    ${escapeHtml(card.rarity || 'N/A')}
+                                </span>
+                            </li>
+                            ${card.illustrator ? `
+                                <li>
+                                    <strong>Ilustrador:</strong> 
+                                    <span class="illustrator">
+                                        ${escapeHtml(card.illustrator)}
+                                    </span>
+                                </li>
+                            ` : ''}
                         </ul>
                     </div>
                 </div>
@@ -285,13 +330,8 @@ function openModal(card) {
     document.body.style.overflow = 'hidden';
 
     // Event listeners para cerrar
-    const handleEsc = (e) => {
-        if (e.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', handleEsc);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
+    document.addEventListener('keydown', modalCloseHandler);
+    modal.addEventListener('click', modalCloseHandler);
 }
 
 // Añade esta función para cerrar el modal
@@ -404,6 +444,18 @@ function setupEventListeners() {
         if (expansionSelect.value && !searchName.value.trim()) {
             searchCards();
         }
+    });
+
+    // Select de tamaño de página
+    const pageSizeSelect = document.createElement('select');
+    pageSizeSelect.innerHTML = `
+        <option value="20">20 cartas/página</option>
+        <option value="50" selected>50 cartas/página</option>
+        <option value="100">100 cartas/página</option>
+    `;
+    pageSizeSelect.addEventListener('change', () => {
+        currentPage = 1;
+        searchCards();
     });
 }
 

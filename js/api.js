@@ -88,13 +88,15 @@ export async function fetchSets() {
     }
 }
 
-// Función para obtener cartas por query
+// Modificar la función fetchCardsByQuery
 export async function fetchCardsByQuery(params) {
     try {
-        const { name, setId } = params;
+        const { name, setId, number, rarities = [], page = 1, pageSize = 50 } = params;
         let endpoint = '';
         
-        if (setId) {
+        if (setId && number) {
+            endpoint = `/en/sets/${setId}/${number}`;
+        } else if (setId) {
             endpoint = `/en/sets/${setId}`;
         } else {
             endpoint = '/en/cards';
@@ -108,44 +110,71 @@ export async function fetchCardsByQuery(params) {
         }
 
         const data = await response.json();
-        let cards;
+        console.log('Datos crudos de la API:', data);
 
-        if (setId) {
-            // Si es un set específico, los datos vienen en data.cards
-            cards = data.cards || [];
-        } else {
-            // Si es búsqueda global, los datos son un array de cartas
-            cards = data || [];
-        }
+        // Obtener el array de cartas
+        let cardsArray = data.cards || [data];
+        
+        // Mapear los datos disponibles de la API
+        let cards = cardsArray.map(card => {
+            if (!card) return null;
+            
+            // Determinar la rareza basada en el set y número de carta
+            let estimatedRarity = 'Common';
+            const cardNum = parseInt(card.localId);
+            if (cardNum <= 16) {
+                estimatedRarity = 'Rare Holo';
+            } else if (cardNum <= 32) {
+                estimatedRarity = 'Rare';
+            } else if (cardNum <= 60) {
+                estimatedRarity = 'Uncommon';
+            }
+            
+            return {
+                id: card.id || '',
+                name: card.name || '',
+                number: card.localId || '',
+                // Ya que la API no proporciona estos datos, usamos valores estimados o por defecto
+                rarity: estimatedRarity,
+                illustrator: 'Unknown', // La API no proporciona el ilustrador
+                images: {
+                    small: card.image ? `${card.image}/low.webp` : null,
+                    large: card.image ? `${card.image}/high.webp` : null
+                },
+                set: {
+                    id: setId || card.set?.id || '',
+                    name: data.name || '',
+                    series: data.serie?.name || ''
+                }
+            };
+        }).filter(card => card !== null);
 
-        // Filtrar por nombre si se especifica
+        // Aplicar filtros
         if (name) {
             cards = cards.filter(card => 
                 card.name.toLowerCase().includes(name.toLowerCase())
             );
         }
 
-        // Procesar las cartas para el formato requerido
-        const processedCards = cards.map(card => ({
-            id: card.id,
-            name: card.name,
-            number: card.localId,
-            rarity: card.rarity,
-            images: {
-                small: `${card.image}/low.webp`,
-                large: `${card.image}/high.webp`
-            },
-            set: {
-                id: setId || card.set?.id,
-                name: data.name || card.set?.name,
-                series: data.series || card.set?.series
-            }
-        }));
+        if (rarities.length > 0) {
+            cards = cards.filter(card => 
+                rarities.includes(card.rarity)
+            );
+        }
+
+        // Calcular paginación
+        const totalCards = cards.length;
+        const totalPages = Math.max(1, Math.ceil(totalCards / pageSize));
+        const paginatedCards = cards.slice((page - 1) * pageSize, page * pageSize);
+
+        console.log('Cartas procesadas:', paginatedCards);
 
         return {
-            cards: processedCards,
-            totalCount: processedCards.length,
-            page: 1
+            cards: paginatedCards,
+            totalCount: totalCards,
+            page,
+            pageSize,
+            totalPages
         };
     } catch (error) {
         console.error('Error en búsqueda:', error);
