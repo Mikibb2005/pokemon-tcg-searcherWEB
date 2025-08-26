@@ -1,63 +1,74 @@
-// /sw.js
-const STATIC_CACHE = 'static-v2';
-const API_CACHE = 'api-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/lists.html',
-  '/offline.html',
-  '/css/styles.css',
-  '/js/api.js',
-  '/js/lazyload.js',
-  '/js/main.js'
-  // añade aquí tus rutas reales (fuentes, imágenes críticas)
-];
+// sw.js - service worker
+const SW_VERSION = 'ptcg-sw-v1';
+const PRECACHE_URLS = [ '/', '/index.html', '/offline.html' ];
+const RUNTIME_IMAGE_CACHE = 'ptcg-images-v1';
+const RUNTIME_API_CACHE = 'ptcg-api-v1';
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then(cache => cache.addAll(STATIC_ASSETS))
-  );
-  self.skipWaiting();
+self.addEventListener('install', evt => {
+  evt.waitUntil((async ()=>{
+    const cache = await caches.open(SW_VERSION);
+    await cache.addAll(PRECACHE_URLS);
+    self.skipWaiting();
+  })());
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => k !== STATIC_CACHE && k !== API_CACHE).map(k => caches.delete(k))
-    ))
-  );
-  self.clients.claim();
+self.addEventListener('activate', evt => {
+  evt.waitUntil((async ()=>{
+    // cleanup old caches
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k=>k!==SW_VERSION && k!==RUNTIME_IMAGE_CACHE && k!==RUNTIME_API_CACHE).map(k=>caches.delete(k)));
+    self.clients.claim();
+  })());
 });
 
-self.addEventListener('fetch', event => {
-  const req = event.request;
-  const url = new URL(req.url);
+// Helpers
+async function cacheFirst(request, cacheName, maxEntries=200){
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if(cached) return cached;
+  try{
+    const resp = await fetch(request);
+    if(resp && resp.ok) await cache.put(request, resp.clone());
+    // optional: enforce maxEntries
+    return resp;
+  }catch(e){
+    return cached || Response.error();
+  }
+}
 
-  // API: stale-while-revalidate
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('api.pokemontcg.io')) {
-    event.respondWith(
-      caches.open(API_CACHE).then(async cache => {
-        const cached = await cache.match(req);
-        const networkFetch = fetch(req).then(networkRes => {
-          if (networkRes && networkRes.ok) cache.put(req, networkRes.clone());
-          return networkRes;
-        }).catch(() => null);
-        return cached || networkFetch || new Response(JSON.stringify({ error: 'offline' }), { headers: { 'Content-Type': 'application/json' }});
-      })
-    );
+async function staleWhileRevalidate(request, cacheName, maxAgeMs=24*3600*1000){
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  const fetchP = fetch(request).then(async resp=>{ if(resp && resp.ok) await cache.put(request, resp.clone()); return resp; }).catch(()=>null);
+  return cached || await fetchP;
+}
+
+self.addEventListener('fetch', evt => {
+  const url = new URL(evt.request.url);
+  // Images: cache-first
+  if(url.pathname.match(/\.(png|jpg|jpeg|webp|gif)$/i) || url.hostname.includes('images.pokemontcg')){
+    evt.respondWith((async ()=>{
+      const r = await cacheFirst(evt.request, RUNTIME_IMAGE_CACHE);
+      if(r) return r;
+      return fetch(evt.request).catch(()=>caches.match('/offline.html'));
+    })());
     return;
   }
 
-  // Static assets: cache-first with network fallback
-  event.respondWith(
-    caches.match(req).then(cached => cached || fetch(req).then(res => {
-      // optional: cache new static assets if needed
-      return res;
-    })).catch(() => {
-      if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
-        return caches.match('/offline.html');
-      }
-      return new Response(null, { status: 504, statusText: 'offline' });
-    })
-  );
+  // API JSON endpoints (heuristic: /v2/cards or /cards or ?q=)
+  if(url.pathname.includes('/v2/') || url.pathname.includes('/cards') || url.searchParams.get('q')){
+    evt.respondWith(staleWhileRevalidate(evt.request, RUNTIME_API_CACHE));
+    return;
+  }
+
+  // default: network-first for HTML pages, fallback to cache
+  if(evt.request.mode === 'navigate'){
+    evt.respondWith((async ()=>{
+      try{ return await fetch(evt.request); }
+      catch(e){ return caches.match(evt.request) || caches.match('/offline.html'); }
+    })());
+    return;
+  }
+
+  // otherwise let browser handle
 });

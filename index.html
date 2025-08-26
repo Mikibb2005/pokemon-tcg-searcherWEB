@@ -101,7 +101,7 @@
     </div>
   </div>
 
-  <!-- scripts: rutas relativas -->
+  <!-- scripts: rutas relativas (mantener orden original para no romper app.js) -->
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
@@ -109,11 +109,204 @@
   <!-- registrar service worker para cache y stale-while-revalidate -->
   <script>
     if ('serviceWorker' in navigator) {
-      // ruta relativa para GitHub Pages; evita usar '/sw.js' (apunta al root del dominio)
+      // ruta relativa para GitHub Pages
       navigator.serviceWorker.register('./sw.js').then(reg => {
         console.log('SW registrado:', reg.scope);
       }).catch(err => console.warn('SW registro falló:', err));
     }
   </script>
+
+  <!-- === PARCHADO CORREGIDO: Arreglos para expansiones y carga de cartas === -->
+  <!-- Este script se carga AL FINAL del body (ahora sí), usa rutas relativas y detecta tus IDs reales -->
+  <script>
+  (async function(){
+    try{
+      // Intenta cargar los scripts optimizados (rutas relativas, no con slash al inicio)
+      function ensureScript(src){
+        if(document.querySelector('script[src="'+src+'"]')) return Promise.resolve();
+        return new Promise((resolve,reject)=>{
+          const s = document.createElement('script');
+          s.src = src; s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+      // no obligamos a que existan; si no están, el fallback usa fetch directo
+      await Promise.all([
+        ensureScript('js/cache.optimized.js').catch(()=>{}),
+        ensureScript('js/api.optimized.js').catch(()=>{}),
+        ensureScript('js/main.optimized.js').catch(()=>{})
+      ]);
+
+      // Localiza los elementos IMPORTANTES por los IDs que usa tu HTML
+      const sel = document.querySelector('#expansionSelect') 
+                 || document.querySelector('#expansions') 
+                 || document.querySelector('select.expansions')
+                 || document.querySelector('select[data-role="expansions"]');
+
+      const cardsContainer = document.querySelector('#cardsGrid') 
+                          || document.querySelector('#cards-grid')
+                          || document.querySelector('.cards-grid')
+                          || (function(){ const m = document.querySelector('main') || document.body; const d = document.createElement('div'); d.id='cardsGrid'; d.className='grid'; m.appendChild(d); return d; })();
+
+      const buscarBtn = document.getElementById('buscarBtn');
+      const searchName = document.getElementById('searchName');
+      const cardNumber = document.getElementById('cardNumber');
+
+      // Generic fetch using PTCGApi if available (dedupe + etag), otherwise fetch
+      async function doFetch(url){
+        if(window.PTCGApi && window.PTCGApi.apiFetch) {
+          return await window.PTCGApi.apiFetch(url).catch(async ()=>{
+            const r = await fetch(url); return r.ok ? r.json() : null;
+          });
+        } else {
+          const r = await fetch(url); return r.ok ? r.json() : null;
+        }
+      }
+
+      // Pobla los sets en el select
+      async function fetchAndPopulateSets(){
+        if(!sel) return;
+        // si ya tiene opciones más que la de carga, no tocar
+        if(sel.options && sel.options.length > 1 && sel.options[0].value !== '') return;
+        const endpoint = 'https://api.pokemontcg.io/v2/sets';
+        const data = await doFetch(endpoint);
+        if(!data) {
+          sel.innerHTML = '<option value=\"\">No se pudieron cargar expansiones</option>';
+          return;
+        }
+        const sets = data.data || data;
+        if(!Array.isArray(sets)) return;
+        sets.sort((a,b)=> (b.releaseDate||'').localeCompare(a.releaseDate||''));
+        sel.innerHTML = '<option value=\"\">-- Elige expansión --</option>';
+        sets.forEach(s=>{
+          const opt = document.createElement('option');
+          opt.value = s.id || s.code || s.name;
+          opt.textContent = s.name + (s.releaseDate ? (' — '+s.releaseDate) : '');
+          sel.appendChild(opt);
+        });
+      }
+
+      // Renderiza cartas: crea <article> con <img data-card-url="..."> para que main.optimized.js las vea
+      function renderCards(cards){
+        cardsContainer.innerHTML = '';
+        if(!cards || !cards.length){ cardsContainer.innerHTML = '<p>No hay cartas.</p>'; return; }
+        const frag = document.createDocumentFragment();
+        cards.forEach(card=>{
+          const c = document.createElement('article');
+          c.className = 'card-item';
+          const img = document.createElement('img');
+          const imgUrl = (card.images && (card.images.small || card.images.large)) || card.imageUrl || card.image || '';
+          if(imgUrl) {
+            img.dataset.cardUrl = imgUrl;
+            img.alt = card.name || 'Carta';
+            img.loading = 'lazy';
+            img.src = img.src || ''; // keep empty so optimized loader replaces it with cached objectURL
+          }
+          const name = document.createElement('h4'); name.textContent = card.name || '';
+          c.appendChild(img);
+          c.appendChild(name);
+          // store card json in dataset for modal usage
+          c.dataset.cardJson = JSON.stringify(card || {});
+          c.addEventListener('click', ()=> openModal(card));
+          frag.appendChild(c);
+        });
+        cardsContainer.appendChild(frag);
+      }
+
+      // Abrir modal con datos de carta
+      function openModal(card){
+        try{
+          const modal = document.getElementById('cardModal');
+          if(!modal) return;
+          document.getElementById('modalImage').dataset.cardUrl = (card.images && (card.images.large || card.images.small)) || card.imageUrl || card.image || '';
+          document.getElementById('modalName').textContent = card.name || '';
+          document.getElementById('modalSet').textContent = (card.set && card.set.name) ? card.set.name : (card.setName || '');
+          document.getElementById('modalNumber').textContent = card.number || '';
+          document.getElementById('modalRarity').textContent = card.rarity || '';
+          document.getElementById('modalPrice').textContent = (card.tcgplayer && card.tcgplayer.prices) ? JSON.stringify(card.tcgplayer.prices) : '';
+          document.getElementById('modalRaw').textContent = JSON.stringify(card, null, 2);
+          modal.setAttribute('aria-hidden','false');
+          modal.style.display = 'block';
+          // The optimized loader will pick up data-card-url and fill modalImage.src
+        }catch(e){ console.warn(e); }
+      }
+
+      // Fetch cards por set
+      async function fetchCardsBySet(setId, pageSize=50){
+        if(!setId) { renderCards([]); return; }
+        const q = encodeURIComponent(`set.id:${setId}`);
+        const endpoint = `https://api.pokemontcg.io/v2/cards?q=${q}&pageSize=${pageSize}`;
+        const data = await doFetch(endpoint);
+        const cards = (data && data.data) || [];
+        renderCards(cards);
+      }
+
+      // Buscar por nombre
+      async function searchCardsByName(name, pageSize=50){
+        if(!name || !name.trim()){ renderCards([]); return; }
+        const safe = name.trim().replace(/"/g,'');
+        // consulta que permite coincidencias parciales por nombre
+        const q = encodeURIComponent(`name:${safe}*`);
+        const endpoint = `https://api.pokemontcg.io/v2/cards?q=${q}&pageSize=${pageSize}`;
+        const data = await doFetch(endpoint);
+        const cards = (data && data.data) || [];
+        renderCards(cards);
+      }
+
+      // hook events: select, buscar button, enter on search input
+      if(sel){
+        sel.addEventListener('change', (e)=> {
+          if(e.target.value) fetchCardsBySet(e.target.value);
+          else cardsContainer.innerHTML = '<p>Selecciona una expansión</p>';
+        });
+      }
+
+      if(buscarBtn && searchName){
+        buscarBtn.addEventListener('click', ()=> searchCardsByName(searchName.value));
+        searchName.addEventListener('keypress', (ev)=> { if(ev.key === 'Enter') searchCardsByName(searchName.value); });
+      }
+
+      // Close modal clickable
+      const closeModal = document.getElementById('closeModal');
+      if(closeModal){
+        closeModal.addEventListener('click', ()=>{
+          const modal = document.getElementById('cardModal');
+          modal.setAttribute('aria-hidden','true');
+          modal.style.display = 'none';
+        });
+      }
+
+      // Keep any <img data-src> or src placeholders mirrored into data-card-url so optimized loader can cache them.
+      function adaptImages(){
+        document.querySelectorAll('img').forEach(img=>{
+          const src = img.getAttribute('src') || img.getAttribute('data-src') || img.dataset.src || '';
+          if(src && !img.dataset.cardUrl){
+            img.dataset.cardUrl = src;
+            if(src.startsWith('data:') || src.includes('placeholder')) img.src = '';
+          }
+        });
+      }
+      adaptImages();
+      new MutationObserver(()=> adaptImages()).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src','data-src']});
+
+      // Inicialización: poblar sets; si ya hay selección, cargar cartas
+      await fetchAndPopulateSets();
+      if(sel && sel.value) fetchCardsBySet(sel.value);
+      else {
+        // si no hay selección: intenta traer las cartas del primer set encontrado
+        if(sel && sel.options && sel.options.length>1){
+          const first = sel.options[1].value;
+          if(first) fetchCardsBySet(first);
+        }
+      }
+
+    }catch(err){
+      console.error('Patch script error:', err);
+    }
+  })();
+  </script>
+  <!-- === FIN DEL PARCHADO CORREGIDO === -->
+  <script type="module" src="js/api.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
