@@ -119,24 +119,13 @@ export async function fetchCardsByQuery(params) {
         let cards = cardsArray.map(card => {
             if (!card) return null;
             
-            // Determinar la rareza basada en el set y número de carta
-            let estimatedRarity = 'Common';
-            const cardNum = parseInt(card.localId);
-            if (cardNum <= 16) {
-                estimatedRarity = 'Rare Holo';
-            } else if (cardNum <= 32) {
-                estimatedRarity = 'Rare';
-            } else if (cardNum <= 60) {
-                estimatedRarity = 'Uncommon';
-            }
-            
             return {
                 id: card.id || '',
                 name: card.name || '',
                 number: card.localId || '',
-                // Ya que la API no proporciona estos datos, usamos valores estimados o por defecto
-                rarity: estimatedRarity,
-                illustrator: 'Unknown', // La API no proporciona el ilustrador
+                // Obtener rarity e illustrator de cada carta individual
+                rarity: card.rarity || 'Unknown', // Usar el valor de la API si existe, sino 'Unknown'
+                illustrator: card.illustrator || 'Unknown', // Usar el valor de la API si existe, sino 'Unknown'
                 images: {
                     small: card.image ? `${card.image}/low.webp` : null,
                     large: card.image ? `${card.image}/high.webp` : null
